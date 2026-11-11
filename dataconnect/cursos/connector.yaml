@@ -1,0 +1,4 @@
+# Conector: el conjunto de queries y mutations que la app puede ejecutar.
+# El cliente NUNCA manda SQL: solo puede invocar por nombre las operaciones
+# definidas en los archivos .gql de esta carpeta.
+connectorId: "cursos"

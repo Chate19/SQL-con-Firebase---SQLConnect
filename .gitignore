@@ -1,0 +1,25 @@
+# dependencias
+node_modules/
+
+# build de Next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Firebase
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+dataconnect-debug.log
+ui-debug.log
+# datos locales del emulador de SQL Connect
+dataconnect/.dataconnect/
+
+# NUNCA commitear claves de service account
+*service-account*.json
+*-firebase-adminsdk-*.json
+
+# varios
+.env*.local
+.DS_Store

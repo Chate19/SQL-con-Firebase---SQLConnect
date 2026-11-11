@@ -1,0 +1,45 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Esquema relacional. Cada `type ... @table` se convierte en una tabla de PostgreSQL.
+#  SQL Connect genera además, para cada tabla, queries y mutations "implícitas"
+#  (cursos, curso, curso_insert, curso_upsert, curso_delete, ...).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Curso: clave primaria UUID generada automáticamente (columna `id`).
+type Curso @table {
+  titulo: String! @col(dataType: "varchar(120)")
+  nivel: String! @col(dataType: "varchar(20)")
+  horas: Int!
+  descripcion: String!
+  cupo: Int!
+}
+
+# Alumno: la clave primaria es el UID de Firebase Auth.
+# `@default(expr: "auth.uid")` hace que, al insertar, el servidor complete el id
+# con el usuario autenticado: el cliente no puede elegirlo.
+type Alumno @table {
+  id: String! @default(expr: "auth.uid")
+  nombre: String! @col(dataType: "varchar(80)")
+  email: String!
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  MATRICULA (L1): relación muchos-a-muchos entre Alumno y Curso.
+#
+#  - Una fila = un alumno inscripto en un curso.
+#  - La clave primaria es COMPUESTA (alumno, curso). Los campos de relación
+#    `alumno: Alumno!` y `curso: Curso!` generan las columnas `alumnoId` y
+#    `cursoId` con sus claves foráneas.
+#  - PostgreSQL crea un índice único sobre (alumnoId, cursoId): es imposible
+#    guardar dos veces la misma inscripción, lo intente quien lo intente.
+#    La regla vive en la base de datos, no en el código del cliente.
+#  - `fecha` la completa el servidor con la hora del request: el cliente no
+#    puede falsearla.
+#
+#  ¿Por qué `Matricula` y no `Inscripcion`? SQL Connect arma el plural agregando
+#  una "s" (curso → cursos). "inscripcions" quedaría mal; "matriculas" no.
+# ─────────────────────────────────────────────────────────────────────────────
+type Matricula @table(key: ["alumno", "curso"]) {
+  alumno: Alumno!
+  curso: Curso!
+  fecha: Timestamp! @default(expr: "request.time")
+}

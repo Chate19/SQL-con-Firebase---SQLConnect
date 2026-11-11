@@ -1,0 +1,61 @@
+# SOLUCIÓN DE REFERENCIA (docente) — Pipeline de producción
+name: Deploy a producción
+
+# A1: corre en cada push a main (incluye el merge de un PR)
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A4: deploys a producción en fila, nunca en paralelo, y sin cortar uno a la mitad
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    # A5: permite configurar aprobación manual en Settings → Environments → production
+    environment:
+      name: production
+      url: https://REEMPLAZAR-POR-TU-PROJECT-ID.web.app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # A2
+      - name: Build (export estático)
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+          NEXT_PUBLIC_BUILD_SHA: ${{ github.sha }}
+          NEXT_PUBLIC_BUILD_REF: ${{ github.ref_name }}
+          NEXT_PUBLIC_BUILD_TIME: ${{ github.event.head_commit.timestamp }}
+
+      - name: Calcular hashes CSP de scripts inline
+        run: node scripts/csp-hashes.mjs out firebase.json
+
+      - name: Deploy al canal live
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_REEMPLAZAR }}
+          projectId: REEMPLAZAR-POR-TU-PROJECT-ID
+          # A3: live = producción
+          channelId: live
+
+      - name: Verificar headers de producción
+        run: node scripts/check-headers.mjs https://REEMPLAZAR-POR-TU-PROJECT-ID.web.app

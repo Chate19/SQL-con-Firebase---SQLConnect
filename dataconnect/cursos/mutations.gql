@@ -1,0 +1,38 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Mutations del conector `cursos`.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Ejemplo resuelto: alta o actualización del perfil del alumno que llama.
+# Observá que el cliente solo manda `nombre`:
+#   - id_expr: "auth.uid"           → el servidor usa el UID del token
+#   - email_expr: "auth.token.email" → el servidor usa el email del token
+# Ningún usuario puede crear o modificar el perfil de otro.
+mutation UpsertAlumno($nombre: String!) @auth(level: USER) {
+  alumno_upsert(data: { id_expr: "auth.uid", nombre: $nombre, email_expr: "auth.token.email" })
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  L2 · Inscribirme: el cliente manda SOLO el curso.
+#
+#  - @auth(level: USER): sin token de Firebase Auth la operación ni se ejecuta.
+#  - `alumnoId_expr: "auth.uid"`: el alumno sale del token que verificó el
+#    servidor, nunca de una variable. Aunque alguien llame la API a mano, no
+#    puede inscribir a otra persona: no hay parámetro para hacerlo.
+#  - `matricula_upsert` (no `insert`): si la fila ya existe, Postgres hace
+#    UPDATE sobre la misma clave compuesta. Repetir la inscripción no falla ni
+#    duplica; `matricula_insert` devolvería un error de clave duplicada.
+# ─────────────────────────────────────────────────────────────────────────────
+mutation Inscribirme($cursoId: UUID!) @auth(level: USER) {
+  matricula_upsert(data: { alumnoId_expr: "auth.uid", cursoId: $cursoId })
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  L5 · DarmeDeBaja: borra SOLO la inscripción del usuario que llama.
+#
+#  La clave del DELETE combina `alumnoId_expr: "auth.uid"` con el `cursoId`
+#  recibido. Un atacante que conozca el curso de otra persona no puede borrarlo:
+#  el borrado siempre apunta a su propio UID (no hay variable de alumno).
+# ─────────────────────────────────────────────────────────────────────────────
+mutation DarmeDeBaja($cursoId: UUID!) @auth(level: USER) {
+  matricula_delete(key: { alumnoId_expr: "auth.uid", cursoId: $cursoId })
+}

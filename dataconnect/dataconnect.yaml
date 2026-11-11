@@ -1,0 +1,16 @@
+# Servicio de SQL Connect (ex Data Connect).
+# Un servicio = un esquema (las tablas) + uno o más conectores (las operaciones expuestas).
+specVersion: "v1"
+serviceId: "catalogo"
+# Región del servicio y de la instancia Cloud SQL. us-east4 es la región por defecto del CLI.
+location: "us-east4"
+schema:
+  source: "./schema"
+  datasource:
+    postgresql:
+      database: "fdcdb"
+      cloudSql:
+        # La primera vez que hagas `firebase deploy --only dataconnect`, se crea esta instancia
+        # bajo la prueba sin costo del plan Spark (90 días, una por proyecto).
+        instanceId: "catalogo-fdc"
+connectorDirs: ["./cursos"]

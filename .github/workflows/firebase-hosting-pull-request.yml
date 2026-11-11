@@ -1,0 +1,62 @@
+# SOLUCIÓN DE REFERENCIA (docente) — Pipeline de preview por Pull Request
+name: Preview en Pull Request
+
+# A1: corre en cada PR (apertura, nuevos commits, reapertura)
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+# A4: un solo build activo por PR; un push nuevo cancela el anterior
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build_and_preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # A2: metadatos del build visibles en el footer
+      - name: Build (export estático)
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+          NEXT_PUBLIC_BUILD_SHA: ${{ github.event.pull_request.head.sha }}
+          NEXT_PUBLIC_BUILD_REF: ${{ github.head_ref }}
+          NEXT_PUBLIC_BUILD_TIME: ${{ github.event.pull_request.updated_at }}
+
+      # Desafío extra (B): CSP con hashes en lugar de 'unsafe-inline'
+      - name: Calcular hashes CSP de scripts inline
+        run: node scripts/csp-hashes.mjs out firebase.json
+
+      - name: Deploy a preview channel
+        id: deploy
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          # A3: el nombre exacto depende del Project ID de cada alumno
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_REEMPLAZAR }}
+          projectId: REEMPLAZAR-POR-TU-PROJECT-ID
+          expires: 3d
+
+      # Gate de calidad: el preview tiene que pasar el chequeo de headers
+      - name: Verificar headers del preview
+        run: node scripts/check-headers.mjs "${{ steps.deploy.outputs.details_url }}"

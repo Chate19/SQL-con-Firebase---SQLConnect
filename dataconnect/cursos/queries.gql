@@ -1,0 +1,66 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Queries del conector `cursos`.
+#  Cada operación DEBE declarar quién puede ejecutarla con @auth:
+#    PUBLIC     → cualquiera, incluso sin login (exige justificar con insecureReason)
+#    USER       → cualquier usuario autenticado con Firebase Auth
+#    NO_ACCESS  → nadie desde el cliente (solo herramientas de admin)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Catálogo: lo puede ver cualquiera.
+query ListCursos @auth(level: PUBLIC, insecureReason: "El catálogo de cursos es información pública.") {
+  cursos(orderBy: { titulo: ASC }) {
+    id
+    titulo
+    nivel
+    horas
+    descripcion
+    cupo
+  }
+}
+
+# L4 · Operación heredada, ahora cerrada.
+#
+# Auditoría: estaba como PUBLIC, así que CUALQUIER cliente anónimo que copiara
+# la config pública del bundle podía ejecutarla y recibir id, nombre y email de
+# todos los alumnos (dato personal + identificador de autenticación). Es una
+# fuga de datos personales y un caso de Broken Object Level Authorization.
+#
+# Decisión: NO_ACCESS. No existe un rol "admin" en Firebase Auth, así que no
+# hay forma de distinguir a un administrador legítimo de un atacante desde el
+# cliente; cualquier nivel distinto de NO_ACCESS seguiría expuesto. El panel de
+# admin debe listar alumnos desde un backend confiable (Cloud Function/Admin SDK
+# con custom claims, o la consola/CLI con privilegios de administrador), nunca
+# desde el navegador. Si hace falta para la app, la solución correcta es una
+# operación nueva con @auth(level: USER) que devuelva solo el alumno que llama
+# (auth.uid), como MisInscripciones.
+query ListAlumnos @auth(level: NO_ACCESS) {
+  alumnos {
+    id
+    nombre
+    email
+  }
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  L3 · MisInscripciones: solo las inscripciones del usuario que llama.
+#
+#  - No recibe variables: el alumno se busca por clave con id_expr: "auth.uid".
+#    Si recibiera $alumnoId, cualquiera podría pasar el UID de otro y leer sus
+#    datos: eso es IDOR (Insecure Direct Object Reference).
+#  - `matriculas_on_alumno` es la relación 1-a-N generada por SQL Connect;
+#    se aliasa a `matriculas` para que coincida con la forma que espera la app.
+# ─────────────────────────────────────────────────────────────────────────────
+query MisInscripciones @auth(level: USER) {
+  alumno(key: { id_expr: "auth.uid" }) {
+    nombre
+    matriculas: matriculas_on_alumno {
+      fecha
+      curso {
+        id
+        titulo
+        nivel
+        horas
+      }
+    }
+  }
+}
